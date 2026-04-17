@@ -3,6 +3,7 @@
   const authTokenKey = "livechat:token";
   const imageSizeLimit = 2 * 1024 * 1024;
   const videoSizeLimit = 10 * 1024 * 1024;
+  const messageMaxLength = 5000;
 
   function getToken() {
     return localStorage.getItem(authTokenKey) || "";
@@ -194,6 +195,7 @@
   const messageInput = document.getElementById("messageInput");
   const imageInput = document.getElementById("imageInput");
   const imagePreviewText = document.getElementById("imagePreviewText");
+  const messageLengthHint = document.getElementById("messageLengthHint");
   const composer = document.querySelector(".kakao-composer");
   const createRoomBtn = document.getElementById("createRoomBtn");
   const joinRoomBtn = document.getElementById("joinRoomBtn");
@@ -357,6 +359,11 @@
     imagePreviewText.textContent = `선택한 ${mediaType}: ${file.name}`;
   }
 
+  function updateMessageLengthHint() {
+    const length = messageInput.value.length;
+    messageLengthHint.textContent = `${length} / ${messageMaxLength}자`;
+  }
+
   function validateSelectedMedia(file) {
     if (!file) {
       return true;
@@ -479,7 +486,22 @@
       renderUsers(payload);
     });
 
-    socket.on("chat:history", (messages) => {
+    socket.on("chat:history", (payload) => {
+      const historyPayload = Array.isArray(payload)
+        ? { roomCode: currentRoom?.code || "", messages: payload }
+        : payload || { roomCode: "", messages: [] };
+
+      const historyRoomCode = historyPayload.roomCode || "";
+      const messages = historyPayload.messages || [];
+
+      if (currentRoom && historyRoomCode && currentRoom.code !== historyRoomCode) {
+        return;
+      }
+
+      if (!currentRoom && messages.length > 0) {
+        return;
+      }
+
       if (!messages.length) {
         clearMessages(currentRoom ? "이 방에는 아직 메시지가 없습니다." : "현재 입장한 방이 없습니다.");
         return;
@@ -592,6 +614,11 @@
       const file = imageInput.files[0];
       let uploadData = null;
 
+      if (text.length > messageMaxLength) {
+        setStatus(`메시지는 ${messageMaxLength}자 이하로만 보낼 수 있습니다.`, "error");
+        return;
+      }
+
       if (file) {
         if (!validateSelectedMedia(file)) {
           return;
@@ -638,6 +665,13 @@
       event.preventDefault();
       sendBtn.click();
     }
+  });
+
+  messageInput.addEventListener("input", () => {
+    if (messageInput.value.length > messageMaxLength) {
+      messageInput.value = messageInput.value.slice(0, messageMaxLength);
+    }
+    updateMessageLengthHint();
   });
 
   createRoomTitle.addEventListener("keydown", (event) => {
@@ -694,6 +728,7 @@
   renderSavedRooms([]);
   renderRecentRooms([]);
   updateImagePreview();
+  updateMessageLengthHint();
   updateComposerState();
   initChatPage();
 }());

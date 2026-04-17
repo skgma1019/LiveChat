@@ -25,6 +25,7 @@ const PORT = 3000;
 const TOKEN_SECRET = process.env.TOKEN_SECRET || "livechat-dev-secret";
 const IMAGE_SIZE_LIMIT = 2 * 1024 * 1024;
 const VIDEO_SIZE_LIMIT = 10 * 1024 * 1024;
+const MESSAGE_MAX_LENGTH = 5000;
 const activeUsers = new Map();
 const uploadsDir = path.join(__dirname, "public", "uploads");
 
@@ -222,8 +223,11 @@ async function leaveCurrentRoom(socket) {
     isHost: false
   });
 
-  socket.emit("chat:history", []);
   socket.emit("room:state", null);
+  socket.emit("chat:history", {
+    roomCode: previousRoomCode,
+    messages: []
+  });
   await emitRoomUsers(previousRoomCode);
 }
 
@@ -253,8 +257,11 @@ async function joinRoom(socket, room) {
     .lean();
 
   await rememberRecentRoom(activeUser.userId, room);
-  socket.emit("chat:history", history);
   await emitRoomState(socket, room.code);
+  socket.emit("chat:history", {
+    roomCode: room.code,
+    messages: history
+  });
   await emitRoomUsers(room.code);
 }
 
@@ -555,6 +562,11 @@ io.on("connection", (socket) => {
       const hasVideo = typeof mediaUrl === "string" && mediaUrl.startsWith("/uploads/") && mediaMime.startsWith("video/");
 
       if (!text && !hasImage && !hasVideo) {
+        return;
+      }
+
+      if (text.length > MESSAGE_MAX_LENGTH) {
+        socket.emit("chat:error", `메시지는 ${MESSAGE_MAX_LENGTH}자 이하로만 보낼 수 있습니다.`);
         return;
       }
 
