@@ -5,6 +5,8 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
+const multer = require("multer");
+const fs = require("fs");
 const path = require("path");
 
 const Message = require("./models/Message");
@@ -24,8 +26,33 @@ const TOKEN_SECRET = process.env.TOKEN_SECRET || "livechat-dev-secret";
 const IMAGE_SIZE_LIMIT = 2 * 1024 * 1024;
 const VIDEO_SIZE_LIMIT = 10 * 1024 * 1024;
 const activeUsers = new Map();
+const uploadsDir = path.join(__dirname, "public", "uploads");
 
-app.use(express.json({ limit: "20mb" }));
+fs.mkdirSync(uploadsDir, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      cb(null, uploadsDir);
+    },
+    filename: (_req, file, cb) => {
+      const extension = path.extname(file.originalname) || "";
+      cb(null, `${Date.now()}-${crypto.randomBytes(6).toString("hex")}${extension}`);
+    }
+  }),
+  limits: {
+    fileSize: VIDEO_SIZE_LIMIT
+  },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/")) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error("Only image and video uploads are allowed."));
+  }
+});
+
+app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
@@ -354,6 +381,40 @@ app.get("/api/rooms/recent", requireHttpUser, async (req, res) => {
   });
 });
 
+app.post("/api/uploads", requireHttpUser, (req, res) => {
+  upload.single("media")(req, res, (error) => {
+    if (error) {
+      if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+        res.status(400).json({ error: "파일 크기가 제한을 초과했습니다. 사진 2MB, 동영상 10MB 이하로 시도해주세요." });
+        return;
+      }
+
+      res.status(400).json({ error: "업로드할 수 없는 파일입니다." });
+      return;
+    }
+
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: "업로드할 파일을 선택해주세요." });
+      return;
+    }
+
+    const isImage = file.mimetype.startsWith("image/");
+    if (isImage && file.size > IMAGE_SIZE_LIMIT) {
+      fs.unlink(file.path, () => {});
+      res.status(400).json({ error: "이미지 크기가 너무 큽니다. 2MB 이하로 시도해주세요." });
+      return;
+    }
+
+    res.status(201).json({
+      mediaUrl: `/uploads/${file.filename}`,
+      mediaMime: file.mimetype,
+      mediaType: isImage ? "image" : "video",
+      originalName: file.originalname
+    });
+  });
+});
+
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth?.token;
@@ -488,22 +549,12 @@ io.on("connection", (socket) => {
       }
 
       const text = msg?.text?.trim() || "";
-      const imageData = msg?.imageData || "";
-      const videoData = msg?.videoData || "";
-      const hasImage = typeof imageData === "string" && imageData.startsWith("data:image/");
-      const hasVideo = typeof videoData === "string" && videoData.startsWith("data:video/");
+      const mediaUrl = msg?.mediaUrl || "";
+      const mediaMime = msg?.mediaMime || "";
+      const hasImage = typeof mediaUrl === "string" && mediaUrl.startsWith("/uploads/") && mediaMime.startsWith("image/");
+      const hasVideo = typeof mediaUrl === "string" && mediaUrl.startsWith("/uploads/") && mediaMime.startsWith("video/");
 
       if (!text && !hasImage && !hasVideo) {
-        return;
-      }
-
-      if (hasImage && imageData.length > IMAGE_SIZE_LIMIT) {
-        socket.emit("chat:error", "이미지 크기가 너무 큽니다. 2MB 이하로 시도해주세요.");
-        return;
-      }
-
-      if (hasVideo && videoData.length > VIDEO_SIZE_LIMIT) {
-        socket.emit("chat:error", "동영상 크기가 너무 큽니다. 10MB 이하로 시도해주세요.");
         return;
       }
 
@@ -520,8 +571,10 @@ io.on("connection", (socket) => {
         roomCode: activeUser.roomCode,
         type: messageType,
         text,
-        imageData: hasImage ? imageData : "",
-        videoData: hasVideo ? videoData : ""
+        mediaUrl: hasImage || hasVideo ? mediaUrl : "",
+        mediaMime: hasImage || hasVideo ? mediaMime : "",
+        imageData: "",
+        videoData: ""
       });
 
       io.to(activeUser.roomCode).emit("chat:receive", saved);

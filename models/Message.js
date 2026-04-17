@@ -24,6 +24,14 @@ const messageSchema = new mongoose.Schema(
       type: String,
       default: ""
     },
+    mediaUrl: {
+      type: String,
+      default: ""
+    },
+    mediaMime: {
+      type: String,
+      default: ""
+    },
     imageData: {
       type: String,
       default: ""

@@ -325,8 +325,10 @@
 
     const name = system ? "시스템" : escapeHtml(msg.sender || "알 수 없음");
     const textBlock = msg.text ? `<div>${escapeHtml(msg.text).replace(/\n/g, "<br />")}</div>` : "";
-    const imageBlock = msg.imageData ? `<img class="message-image" src="${msg.imageData}" alt="채팅 이미지" />` : "";
-    const videoBlock = msg.videoData ? `<video class="message-video" src="${msg.videoData}" controls preload="metadata"></video>` : "";
+    const resolvedImageUrl = msg.mediaMime?.startsWith("image/") ? msg.mediaUrl : msg.imageData;
+    const resolvedVideoUrl = msg.mediaMime?.startsWith("video/") ? msg.mediaUrl : msg.videoData;
+    const imageBlock = resolvedImageUrl ? `<img class="message-image" src="${resolvedImageUrl}" alt="채팅 이미지" />` : "";
+    const videoBlock = resolvedVideoUrl ? `<video class="message-video" src="${resolvedVideoUrl}" controls preload="metadata"></video>` : "";
 
     li.innerHTML = `
       <div class="message-meta">
@@ -372,10 +374,24 @@
 
   function fileToDataUrl(file) {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(new Error("이미지 파일을 읽을 수 없습니다."));
-      reader.readAsDataURL(file);
+      const formData = new FormData();
+      formData.append("media", file);
+
+      fetch("/api/uploads", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${getToken()}`
+        },
+        body: formData
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || "파일 업로드 중 오류가 발생했습니다.");
+          }
+          resolve(data);
+        })
+        .catch((error) => reject(error));
     });
   }
 
@@ -550,21 +566,27 @@
     try {
       const text = messageInput.value.trim();
       const file = imageInput.files[0];
-      const mediaData = file ? await fileToDataUrl(file) : "";
-      const imageData = file && file.type.startsWith("image/") ? mediaData : "";
-      const videoData = file && file.type.startsWith("video/") ? mediaData : "";
+      let uploadData = null;
 
-      if (!text && !imageData && !videoData) {
+      if (file) {
+        setStatus("미디어를 업로드하는 중입니다...", "default");
+        uploadData = await fileToDataUrl(file);
+      }
+
+      if (!text && !uploadData) {
         return;
       }
 
       socket.emit("chat:send", {
         text,
-        imageData,
-        videoData
+        mediaUrl: uploadData?.mediaUrl || "",
+        mediaMime: uploadData?.mediaMime || "",
+        imageData: "",
+        videoData: ""
       });
 
       resetComposer();
+      setStatus("메시지를 보냈습니다.", "success");
     } catch (error) {
       setStatus(error.message, "error");
     }
