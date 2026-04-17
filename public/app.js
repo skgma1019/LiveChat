@@ -311,7 +311,8 @@
     }
 
     const li = document.createElement("li");
-    li.className = `message-item${system ? " system-message" : ""}`;
+    const isSelf = !system && currentUser && msg.senderId && String(msg.senderId) === String(currentUser.id);
+    li.className = `message-item${system ? " system-message" : ""}${isSelf ? " self-message" : ""}`;
 
     const name = system ? "시스템" : escapeHtml(msg.sender || "알 수 없음");
     const textBlock = msg.text ? `<div>${escapeHtml(msg.text).replace(/\n/g, "<br />")}</div>` : "";
