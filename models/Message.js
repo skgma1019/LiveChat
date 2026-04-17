@@ -17,7 +17,7 @@ const messageSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["text", "image"],
+      enum: ["text", "image", "video"],
       default: "text"
     },
     text: {
@@ -25,6 +25,10 @@ const messageSchema = new mongoose.Schema(
       default: ""
     },
     imageData: {
+      type: String,
+      default: ""
+    },
+    videoData: {
       type: String,
       default: ""
     }

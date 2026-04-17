@@ -22,9 +22,10 @@ const io = new Server(server, {
 const PORT = 3000;
 const TOKEN_SECRET = process.env.TOKEN_SECRET || "livechat-dev-secret";
 const IMAGE_SIZE_LIMIT = 2 * 1024 * 1024;
+const VIDEO_SIZE_LIMIT = 10 * 1024 * 1024;
 const activeUsers = new Map();
 
-app.use(express.json({ limit: "5mb" }));
+app.use(express.json({ limit: "20mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
@@ -488,9 +489,11 @@ io.on("connection", (socket) => {
 
       const text = msg?.text?.trim() || "";
       const imageData = msg?.imageData || "";
+      const videoData = msg?.videoData || "";
       const hasImage = typeof imageData === "string" && imageData.startsWith("data:image/");
+      const hasVideo = typeof videoData === "string" && videoData.startsWith("data:video/");
 
-      if (!text && !hasImage) {
+      if (!text && !hasImage && !hasVideo) {
         return;
       }
 
@@ -499,13 +502,26 @@ io.on("connection", (socket) => {
         return;
       }
 
+      if (hasVideo && videoData.length > VIDEO_SIZE_LIMIT) {
+        socket.emit("chat:error", "동영상 크기가 너무 큽니다. 10MB 이하로 시도해주세요.");
+        return;
+      }
+
+      if (hasImage && hasVideo) {
+        socket.emit("chat:error", "한 번에 사진 또는 동영상 하나만 보낼 수 있습니다.");
+        return;
+      }
+
+      const messageType = hasVideo ? "video" : hasImage ? "image" : "text";
+
       const saved = await Message.create({
         sender: activeUser.nickname,
         senderId: activeUser.userId,
         roomCode: activeUser.roomCode,
-        type: hasImage ? "image" : "text",
+        type: messageType,
         text,
-        imageData: hasImage ? imageData : ""
+        imageData: hasImage ? imageData : "",
+        videoData: hasVideo ? videoData : ""
       });
 
       io.to(activeUser.roomCode).emit("chat:receive", saved);

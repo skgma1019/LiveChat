@@ -326,6 +326,7 @@
     const name = system ? "시스템" : escapeHtml(msg.sender || "알 수 없음");
     const textBlock = msg.text ? `<div>${escapeHtml(msg.text).replace(/\n/g, "<br />")}</div>` : "";
     const imageBlock = msg.imageData ? `<img class="message-image" src="${msg.imageData}" alt="채팅 이미지" />` : "";
+    const videoBlock = msg.videoData ? `<video class="message-video" src="${msg.videoData}" controls preload="metadata"></video>` : "";
 
     li.innerHTML = `
       <div class="message-meta">
@@ -334,6 +335,7 @@
       </div>
       ${textBlock}
       ${imageBlock}
+      ${videoBlock}
     `;
 
     messageList.appendChild(li);
@@ -342,7 +344,13 @@
 
   function updateImagePreview() {
     const file = imageInput.files[0];
-    imagePreviewText.textContent = file ? `선택한 사진: ${file.name}` : "사진은 선택 사항입니다.";
+    if (!file) {
+      imagePreviewText.textContent = "사진 또는 동영상은 선택 사항입니다.";
+      return;
+    }
+
+    const mediaType = file.type.startsWith("video/") ? "동영상" : "사진";
+    imagePreviewText.textContent = `선택한 ${mediaType}: ${file.name}`;
   }
 
   function updateComposerState() {
@@ -542,15 +550,18 @@
     try {
       const text = messageInput.value.trim();
       const file = imageInput.files[0];
-      const imageData = file ? await fileToDataUrl(file) : "";
+      const mediaData = file ? await fileToDataUrl(file) : "";
+      const imageData = file && file.type.startsWith("image/") ? mediaData : "";
+      const videoData = file && file.type.startsWith("video/") ? mediaData : "";
 
-      if (!text && !imageData) {
+      if (!text && !imageData && !videoData) {
         return;
       }
 
       socket.emit("chat:send", {
         text,
-        imageData
+        imageData,
+        videoData
       });
 
       resetComposer();
