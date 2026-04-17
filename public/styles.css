@@ -132,6 +132,11 @@ p {
   padding: 22px;
 }
 
+.helper-text {
+  margin: -2px 0 0;
+  line-height: 1.5;
+}
+
 .auth-single {
   display: grid;
   gap: 16px;
@@ -239,7 +244,7 @@ button:hover,
   padding: 0;
   min-height: 680px;
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto auto 1fr auto;
   gap: 0;
   overflow: hidden;
 }
@@ -260,6 +265,21 @@ button:hover,
   grid-template-columns: 280px minmax(0, 1fr);
   gap: 0;
   min-height: 0;
+}
+
+.chat-guide {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 18px;
+  background: rgba(255, 255, 255, 0.68);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.chat-guide strong {
+  color: #444;
 }
 
 .kakao-chat-head {
@@ -287,6 +307,10 @@ button:hover,
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.78);
   padding: 12px;
+}
+
+.saved-list button {
+  width: 100%;
 }
 
 .badge {
@@ -374,6 +398,15 @@ button:hover,
   background: rgba(244, 247, 250, 0.92);
 }
 
+.kakao-composer.disabled {
+  opacity: 0.65;
+}
+
+.kakao-composer.disabled input,
+.kakao-composer.disabled button {
+  pointer-events: none;
+}
+
 #messageInput {
   background: white;
   border-radius: 999px;
@@ -390,6 +423,11 @@ button:hover,
   border: 1px dashed rgba(255, 255, 255, 0.8);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.45);
+}
+
+.saved-list .empty-state,
+.user-list .empty-state {
+  background: rgba(255, 255, 255, 0.68);
 }
 
 @media (max-width: 960px) {

@@ -186,11 +186,17 @@
   const roomSubtitle = document.getElementById("roomSubtitle");
   const roomCodeBadge = document.getElementById("roomCodeBadge");
   const hostBadge = document.getElementById("hostBadge");
+  const chatGuide = document.getElementById("chatGuide");
   const usersList = document.getElementById("usersList");
   const messageList = document.getElementById("messageList");
   const messageInput = document.getElementById("messageInput");
   const imageInput = document.getElementById("imageInput");
   const imagePreviewText = document.getElementById("imagePreviewText");
+  const composer = document.querySelector(".kakao-composer");
+  const createRoomBtn = document.getElementById("createRoomBtn");
+  const joinRoomBtn = document.getElementById("joinRoomBtn");
+  const leaveRoomBtn = document.getElementById("leaveRoomBtn");
+  const sendBtn = document.getElementById("sendBtn");
 
   let currentUser = null;
   let currentRoom = null;
@@ -209,15 +215,18 @@
       roomSubtitle.textContent = "로그인 후 방을 만들거나, 방 코드로 참가해주세요.";
       roomCodeBadge.classList.add("hidden");
       hostBadge.classList.add("hidden");
+      chatGuide.classList.remove("hidden");
     } else {
       roomTitle.textContent = currentRoom.title;
       roomSubtitle.textContent = `${currentUser.nickname} 님으로 접속 중입니다. 현재 방 코드는 ${currentRoom.code} 입니다.`;
       roomCodeBadge.textContent = `방 코드 ${currentRoom.code}`;
       roomCodeBadge.classList.remove("hidden");
       hostBadge.classList.toggle("hidden", !currentRoom.isHost);
+      chatGuide.classList.add("hidden");
     }
 
     renderUserProfile();
+    updateComposerState();
   }
 
   function renderSavedRooms(rooms) {
@@ -334,6 +343,16 @@
   function updateImagePreview() {
     const file = imageInput.files[0];
     imagePreviewText.textContent = file ? `선택한 사진: ${file.name}` : "사진은 선택 사항입니다.";
+  }
+
+  function updateComposerState() {
+    const enabled = Boolean(currentRoom);
+    composer.classList.toggle("disabled", !enabled);
+    messageInput.disabled = !enabled;
+    imageInput.disabled = !enabled;
+    sendBtn.disabled = !enabled;
+    leaveRoomBtn.disabled = !enabled;
+    messageInput.placeholder = enabled ? "메시지를 입력하세요." : "방에 들어가면 메시지를 입력할 수 있습니다.";
   }
 
   function resetComposer() {
@@ -475,7 +494,7 @@
     window.location.replace("/");
   });
 
-  document.getElementById("createRoomBtn").addEventListener("click", () => {
+  createRoomBtn.addEventListener("click", () => {
     if (!socket) {
       setStatus("로그인 후 다시 시도해주세요.", "error");
       return;
@@ -488,7 +507,7 @@
     createRoomTitle.value = "";
   });
 
-  document.getElementById("joinRoomBtn").addEventListener("click", () => {
+  joinRoomBtn.addEventListener("click", () => {
     if (!socket) {
       setStatus("로그인 후 다시 시도해주세요.", "error");
       return;
@@ -505,7 +524,7 @@
     joinRoomCode.value = "";
   });
 
-  document.getElementById("leaveRoomBtn").addEventListener("click", () => {
+  leaveRoomBtn.addEventListener("click", () => {
     if (!socket) {
       return;
     }
@@ -514,7 +533,7 @@
     setStatus("현재 방에서 나왔습니다.", "success");
   });
 
-  document.getElementById("sendBtn").addEventListener("click", async () => {
+  sendBtn.addEventListener("click", async () => {
     if (!socket || !currentRoom) {
       setStatus("먼저 방에 입장해주세요.", "error");
       return;
@@ -550,7 +569,21 @@
   messageInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
-      document.getElementById("sendBtn").click();
+      sendBtn.click();
+    }
+  });
+
+  createRoomTitle.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      createRoomBtn.click();
+    }
+  });
+
+  joinRoomCode.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      joinRoomBtn.click();
     }
   });
 
@@ -594,5 +627,6 @@
   renderSavedRooms([]);
   renderRecentRooms([]);
   updateImagePreview();
+  updateComposerState();
   initChatPage();
 }());
