@@ -18,7 +18,7 @@ mongoose.connect(process.env.MONGODB_URI)
 app.get("/", (req, res) => {
   res.send("서버 정상 작동");
 });
-
+app.use(express.static(path.join(__dirname, "public")));
 // Socket
 const io = new Server(server, {
   cors: {
