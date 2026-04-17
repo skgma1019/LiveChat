@@ -2,12 +2,31 @@ const mongoose = require("mongoose");
 
 const messageSchema = new mongoose.Schema(
   {
-    sender: String,
-    text: String,
-    room: {
+    sender: {
       type: String,
-      default: "lobby",
+      required: true
+    },
+    senderId: {
+      type: String,
+      default: ""
+    },
+    roomCode: {
+      type: String,
+      required: true,
       index: true
+    },
+    type: {
+      type: String,
+      enum: ["text", "image"],
+      default: "text"
+    },
+    text: {
+      type: String,
+      default: ""
+    },
+    imageData: {
+      type: String,
+      default: ""
     }
   },
   { timestamps: true }

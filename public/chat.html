@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>채팅 - LiveChat</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body data-page="chat">
+  <div class="app-shell">
+    <section id="statusBar" class="status-bar hidden"></section>
+
+    <section class="dashboard">
+      <div class="stack">
+        <div class="card panel">
+          <h2>내 정보</h2>
+          <div class="profile-box">
+            <div class="info-chip"><span>닉네임</span><strong id="profileNickname">-</strong></div>
+            <div class="info-chip"><span>아이디</span><strong id="profileUsername">-</strong></div>
+            <div class="info-chip"><span>현재 방</span><strong id="profileRoom">없음</strong></div>
+            <div class="info-chip"><span>권한</span><strong id="profileRole">참가자</strong></div>
+          </div>
+          <div class="button-row">
+            <button id="logoutBtn" class="secondary" type="button">로그아웃</button>
+          </div>
+        </div>
+
+        <div class="card panel">
+          <h2>방 만들기</h2>
+          <div class="room-actions">
+            <div>
+              <label for="createRoomTitle">방 제목</label>
+              <input id="createRoomTitle" type="text" placeholder="예: 우리 팀 회의방" />
+            </div>
+            <button id="createRoomBtn" type="button">랜덤 코드로 방 만들기</button>
+          </div>
+        </div>
+
+        <div class="card panel">
+          <h2>방 참가</h2>
+          <div class="room-actions">
+            <div>
+              <label for="joinRoomCode">방 코드</label>
+              <input id="joinRoomCode" type="text" placeholder="예: A1B2C3" />
+            </div>
+            <div class="button-row">
+              <button id="joinRoomBtn" type="button">방 코드로 입장</button>
+              <button id="leaveRoomBtn" class="secondary" type="button">현재 방 나가기</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card panel">
+          <h2>내가 만든 방</h2>
+          <ul id="savedRooms" class="saved-list"></ul>
+        </div>
+      </div>
+
+      <div class="card chat-card">
+        <div class="chat-head">
+          <div>
+            <div class="eyebrow">Chat Room</div>
+            <h2 id="roomTitle">방에 아직 입장하지 않았습니다.</h2>
+            <p class="muted" id="roomSubtitle">로그인 후 방을 만들거나, 방 코드로 참가해주세요.</p>
+          </div>
+          <div class="top-inline">
+            <span id="roomCodeBadge" class="badge hidden"></span>
+            <span id="hostBadge" class="badge hidden">방장 권한 사용 중</span>
+          </div>
+        </div>
+
+        <div class="chat-layout">
+          <aside class="card panel">
+            <h3>접속자 목록</h3>
+            <ul id="usersList" class="user-list"></ul>
+          </aside>
+
+          <section class="message-board">
+            <ul id="messageList" class="message-list"></ul>
+          </section>
+        </div>
+
+        <div class="composer">
+          <div class="muted" id="imagePreviewText">사진은 선택 사항입니다.</div>
+          <div class="composer-row">
+            <input id="messageInput" type="text" placeholder="메시지를 입력하세요." />
+            <input id="imageInput" type="file" accept="image/*" />
+          </div>
+          <div class="button-row">
+            <button id="sendBtn" type="button">메시지 보내기</button>
+            <button id="clearImageBtn" class="secondary" type="button">사진 선택 해제</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

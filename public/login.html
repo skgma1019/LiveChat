@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>로그인 - LiveChat</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body data-page="login">
+  <div class="app-shell narrow-shell">
+    <section id="statusBar" class="status-bar hidden"></section>
+
+    <section class="card panel auth-single">
+      <div class="eyebrow">Login</div>
+      <h1>로그인</h1>
+      <div class="field-grid">
+        <div>
+          <label for="loginUsername">아이디</label>
+          <input id="loginUsername" type="text" placeholder="아이디 입력" />
+        </div>
+        <div>
+          <label for="loginPassword">비밀번호</label>
+          <input id="loginPassword" type="password" placeholder="비밀번호 입력" />
+        </div>
+      </div>
+      <div class="button-row">
+        <button id="loginBtn" type="button">로그인</button>
+        <a class="button-link secondary-link" href="/">메인으로</a>
+      </div>
+      <p class="muted">계정이 없다면 <a href="/register.html">회원가입</a> 후 바로 채팅을 시작할 수 있습니다.</p>
+    </section>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

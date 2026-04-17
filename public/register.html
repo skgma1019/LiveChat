@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>회원가입 - LiveChat</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body data-page="register">
+  <div class="app-shell narrow-shell">
+    <section id="statusBar" class="status-bar hidden"></section>
+
+    <section class="card panel auth-single">
+      <div class="eyebrow">Register</div>
+      <h1>회원가입</h1>
+      <div class="field-grid">
+        <div>
+          <label for="registerUsername">아이디</label>
+          <input id="registerUsername" type="text" placeholder="새 아이디 입력" />
+        </div>
+        <div>
+          <label for="registerNickname">닉네임</label>
+          <input id="registerNickname" type="text" placeholder="표시할 닉네임 입력" />
+        </div>
+        <div>
+          <label for="registerPassword">비밀번호</label>
+          <input id="registerPassword" type="password" placeholder="4자 이상 입력" />
+        </div>
+      </div>
+      <div class="button-row">
+        <button id="registerBtn" type="button">회원가입</button>
+        <a class="button-link secondary-link" href="/">메인으로</a>
+      </div>
+      <p class="muted">이미 계정이 있다면 <a href="/login.html">로그인</a>으로 이동하세요.</p>
+    </section>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
