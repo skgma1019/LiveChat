@@ -1,6 +1,8 @@
 (function () {
   const page = document.body.dataset.page;
   const authTokenKey = "livechat:token";
+  const imageSizeLimit = 2 * 1024 * 1024;
+  const videoSizeLimit = 10 * 1024 * 1024;
 
   function getToken() {
     return localStorage.getItem(authTokenKey) || "";
@@ -355,6 +357,28 @@
     imagePreviewText.textContent = `선택한 ${mediaType}: ${file.name}`;
   }
 
+  function validateSelectedMedia(file) {
+    if (!file) {
+      return true;
+    }
+
+    if (file.type.startsWith("image/") && file.size > imageSizeLimit) {
+      imageInput.value = "";
+      updateImagePreview();
+      setStatus("사진 파일이 너무 큽니다. 2MB 이하 파일만 업로드할 수 있습니다.", "error");
+      return false;
+    }
+
+    if (file.type.startsWith("video/") && file.size > videoSizeLimit) {
+      imageInput.value = "";
+      updateImagePreview();
+      setStatus("동영상 파일이 너무 큽니다. 10MB 이하 파일만 업로드할 수 있습니다.", "error");
+      return false;
+    }
+
+    return true;
+  }
+
   function updateComposerState() {
     const enabled = Boolean(currentRoom);
     composer.classList.toggle("disabled", !enabled);
@@ -569,6 +593,9 @@
       let uploadData = null;
 
       if (file) {
+        if (!validateSelectedMedia(file)) {
+          return;
+        }
         setStatus("미디어를 업로드하는 중입니다...", "default");
         uploadData = await fileToDataUrl(file);
       }
@@ -597,7 +624,14 @@
     updateImagePreview();
   });
 
-  imageInput.addEventListener("change", updateImagePreview);
+  imageInput.addEventListener("change", () => {
+    const file = imageInput.files[0];
+    if (!validateSelectedMedia(file)) {
+      return;
+    }
+
+    updateImagePreview();
+  });
 
   messageInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
