@@ -20,6 +20,25 @@ const userSchema = new mongoose.Schema(
     passwordSalt: {
       type: String,
       required: true
+    },
+    recentRooms: {
+      type: [
+        {
+          code: {
+            type: String,
+            required: true
+          },
+          title: {
+            type: String,
+            required: true
+          },
+          joinedAt: {
+            type: Date,
+            default: Date.now
+          }
+        }
+      ],
+      default: []
     }
   },
   { timestamps: true }

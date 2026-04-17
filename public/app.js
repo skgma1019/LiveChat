@@ -179,6 +179,7 @@
   const profileRoom = document.getElementById("profileRoom");
   const profileRole = document.getElementById("profileRole");
   const savedRooms = document.getElementById("savedRooms");
+  const recentRooms = document.getElementById("recentRooms");
   const createRoomTitle = document.getElementById("createRoomTitle");
   const joinRoomCode = document.getElementById("joinRoomCode");
   const roomTitle = document.getElementById("roomTitle");
@@ -220,13 +221,21 @@
   }
 
   function renderSavedRooms(rooms) {
-    savedRooms.innerHTML = "";
+    renderRoomList(savedRooms, rooms, "아직 만든 방이 없습니다.");
+  }
+
+  function renderRecentRooms(rooms) {
+    renderRoomList(recentRooms, rooms, "아직 들어간 방 기록이 없습니다.");
+  }
+
+  function renderRoomList(target, rooms, emptyText) {
+    target.innerHTML = "";
 
     if (!rooms.length) {
       const li = document.createElement("li");
       li.className = "empty-state";
-      li.textContent = "아직 만든 방이 없습니다.";
-      savedRooms.appendChild(li);
+      li.textContent = emptyText;
+      target.appendChild(li);
       return;
     }
 
@@ -239,7 +248,7 @@
         </div>
         <button type="button" class="secondary" data-room-code="${room.code}">이 방으로 입장</button>
       `;
-      savedRooms.appendChild(li);
+      target.appendChild(li);
     });
   }
 
@@ -347,6 +356,11 @@
     renderSavedRooms(data.rooms || []);
   }
 
+  async function refreshRecentRooms() {
+    const data = await apiRequest("/api/rooms/recent");
+    renderRecentRooms(data.rooms || []);
+  }
+
   function disconnectSocket() {
     if (socket) {
       socket.disconnect();
@@ -374,6 +388,9 @@
       renderRoomHeader();
       if (room?.isHost) {
         refreshMyRooms().catch(() => {});
+      }
+      if (room) {
+        refreshRecentRooms().catch(() => {});
       }
       if (!room) {
         clearMessages("현재 입장한 방이 없습니다.");
@@ -444,6 +461,7 @@
     clearMessages("방을 만들거나 참가하면 대화가 여기에 표시됩니다.");
     renderUsers({ users: [] });
     await refreshMyRooms();
+    await refreshRecentRooms();
     connectSocket();
     setStatus(`${currentUser.nickname} 님으로 로그인되어 있습니다.`, "success");
   }
@@ -547,6 +565,18 @@
     setStatus(`${button.dataset.roomCode} 방으로 입장 중입니다...`);
   });
 
+  recentRooms.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-room-code]");
+    if (!button || !socket) {
+      return;
+    }
+
+    socket.emit("room:join", {
+      code: button.dataset.roomCode
+    });
+    setStatus(`${button.dataset.roomCode} 방으로 입장 중입니다...`);
+  });
+
   usersList.addEventListener("click", (event) => {
     const button = event.target.closest("[data-kick-socket]");
     if (!button || !socket) {
@@ -561,6 +591,7 @@
   clearMessages("방을 만들거나 참가하면 대화가 여기에 표시됩니다.");
   renderUsers({ users: [] });
   renderSavedRooms([]);
+  renderRecentRooms([]);
   updateImagePreview();
   initChatPage();
 }());

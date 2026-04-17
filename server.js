@@ -95,6 +95,23 @@ function sanitizeUser(user) {
   };
 }
 
+async function rememberRecentRoom(userId, room) {
+  const user = await User.findById(userId);
+  if (!user) {
+    return;
+  }
+
+  const roomCode = String(room.code).toUpperCase();
+  const filteredRooms = (user.recentRooms || []).filter((item) => item.code !== roomCode);
+  filteredRooms.unshift({
+    code: roomCode,
+    title: room.title,
+    joinedAt: new Date()
+  });
+  user.recentRooms = filteredRooms.slice(0, 10);
+  await user.save();
+}
+
 function buildRoomUserList(roomCode) {
   return Array.from(activeUsers.entries())
     .filter(([, user]) => user.roomCode === roomCode)
@@ -207,6 +224,7 @@ async function joinRoom(socket, room) {
     .limit(100)
     .lean();
 
+  await rememberRecentRoom(activeUser.userId, room);
   socket.emit("chat:history", history);
   await emitRoomState(socket, room.code);
   await emitRoomUsers(room.code);
@@ -317,6 +335,21 @@ app.get("/api/rooms/mine", requireHttpUser, async (req, res) => {
       title: room.title,
       hostUserId: String(room.hostUserId)
     }))
+  });
+});
+
+app.get("/api/rooms/recent", requireHttpUser, async (req, res) => {
+  const recentRooms = (req.user.recentRooms || [])
+    .slice()
+    .sort((a, b) => new Date(b.joinedAt) - new Date(a.joinedAt))
+    .map((room) => ({
+      code: room.code,
+      title: room.title,
+      joinedAt: room.joinedAt
+    }));
+
+  res.json({
+    rooms: recentRooms
   });
 });
 
