@@ -83,7 +83,10 @@ function decodeBase64Url(input) {
 function createAuthToken(user) {
   const payload = JSON.stringify({
     userId: String(user._id),
-    issuedAt: Date.now()
+    username: user.username,
+    nickname: user.nickname,
+    issuedAt: Date.now(),
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000
   });
   const payloadPart = encodeBase64Url(payload);
   const signature = crypto
@@ -105,12 +108,18 @@ function verifyAuthToken(token) {
     .update(payloadPart)
     .digest("hex");
 
-  if (signature !== expectedSignature) {
+  const sigBuf = Buffer.from(signature, "hex");
+  const expBuf = Buffer.from(expectedSignature, "hex");
+  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
     return null;
   }
 
   try {
-    return JSON.parse(decodeBase64Url(payloadPart));
+    const payload = JSON.parse(decodeBase64Url(payloadPart));
+    if (payload.expiresAt && payload.expiresAt < Date.now()) {
+      return null;
+    }
+    return payload;
   } catch (error) {
     return null;
   }
@@ -237,6 +246,11 @@ async function joinRoom(socket, room) {
     throw new Error("Unauthorized socket.");
   }
 
+  if (activeUser.roomCode === room.code) {
+    await emitRoomState(socket, room.code);
+    return;
+  }
+
   if (activeUser.roomCode && activeUser.roomCode !== room.code) {
     await leaveCurrentRoom(socket);
   }
@@ -265,7 +279,7 @@ async function joinRoom(socket, room) {
   await emitRoomUsers(room.code);
 }
 
-async function requireHttpUser(req, res, next) {
+function requireHttpUser(req, res, next) {
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
   const payload = verifyAuthToken(token);
@@ -275,13 +289,12 @@ async function requireHttpUser(req, res, next) {
     return;
   }
 
-  const user = await User.findById(payload.userId);
-  if (!user) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-
-  req.user = user;
+  req.user = {
+    _id: payload.userId,
+    id: payload.userId,
+    username: payload.username,
+    nickname: payload.nickname
+  };
   next();
 }
 
@@ -374,7 +387,8 @@ app.get("/api/rooms/mine", requireHttpUser, async (req, res) => {
 });
 
 app.get("/api/rooms/recent", requireHttpUser, async (req, res) => {
-  const recentRooms = (req.user.recentRooms || [])
+  const user = await User.findById(req.user._id, "recentRooms").lean();
+  const recentRooms = (user?.recentRooms || [])
     .slice()
     .sort((a, b) => new Date(b.joinedAt) - new Date(a.joinedAt))
     .map((room) => ({
@@ -422,7 +436,7 @@ app.post("/api/uploads", requireHttpUser, (req, res) => {
   });
 });
 
-io.use(async (socket, next) => {
+io.use((socket, next) => {
   try {
     const token = socket.handshake.auth?.token;
     const payload = verifyAuthToken(token);
@@ -432,13 +446,11 @@ io.use(async (socket, next) => {
       return;
     }
 
-    const user = await User.findById(payload.userId);
-    if (!user) {
-      next(new Error("Unauthorized"));
-      return;
-    }
-
-    socket.user = sanitizeUser(user);
+    socket.user = {
+      id: payload.userId,
+      username: payload.username,
+      nickname: payload.nickname
+    };
     next();
   } catch (error) {
     next(new Error("Unauthorized"));
@@ -481,6 +493,11 @@ io.on("connection", (socket) => {
         return;
       }
 
+      if (!/^[0-9A-F]{6}$/.test(roomCode)) {
+        socket.emit("chat:error", "방 코드는 영문/숫자 6자리입니다. (예: A1B2C3)");
+        return;
+      }
+
       const room = await Room.findOne({ code: roomCode });
       if (!room) {
         socket.emit("chat:error", "존재하지 않는 방 코드입니다.");
@@ -506,16 +523,9 @@ io.on("connection", (socket) => {
   socket.on("room:kick", async ({ targetSocketId }) => {
     try {
       const activeUser = activeUsers.get(socket.id);
-      const targetUser = activeUsers.get(targetSocketId);
 
-      if (!activeUser?.roomCode || !targetUser?.roomCode || activeUser.roomCode !== targetUser.roomCode) {
-        socket.emit("chat:error", "강퇴할 사용자를 찾을 수 없습니다.");
-        return;
-      }
-
-      const room = await Room.findOne({ code: activeUser.roomCode });
-      if (!room || String(room.hostUserId) !== activeUser.userId) {
-        socket.emit("chat:error", "방장만 강퇴할 수 있습니다.");
+      if (!activeUser?.roomCode) {
+        socket.emit("chat:error", "방에 참가한 상태에서만 강퇴할 수 있습니다.");
         return;
       }
 
@@ -527,6 +537,18 @@ io.on("connection", (socket) => {
       const targetSocket = io.sockets.sockets.get(targetSocketId);
       if (!targetSocket) {
         socket.emit("chat:error", "대상 사용자가 이미 접속 종료되었습니다.");
+        return;
+      }
+
+      const targetUser = activeUsers.get(targetSocketId);
+      if (!targetUser?.roomCode || activeUser.roomCode !== targetUser.roomCode) {
+        socket.emit("chat:error", "강퇴할 사용자를 찾을 수 없습니다.");
+        return;
+      }
+
+      const room = await Room.findOne({ code: activeUser.roomCode });
+      if (!room || String(room.hostUserId) !== activeUser.userId) {
+        socket.emit("chat:error", "방장만 강퇴할 수 있습니다.");
         return;
       }
 
@@ -550,7 +572,7 @@ io.on("connection", (socket) => {
   socket.on("chat:send", async (msg) => {
     try {
       const activeUser = activeUsers.get(socket.id);
-      if (!activeUser?.roomCode) {
+      if (!activeUser?.roomCode || !socket.rooms.has(activeUser.roomCode)) {
         socket.emit("chat:error", "먼저 방에 참가해주세요.");
         return;
       }

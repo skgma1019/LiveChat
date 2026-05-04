@@ -589,6 +589,11 @@
       return;
     }
 
+    if (!/^[0-9A-Z]{6}$/.test(code)) {
+      setStatus("방 코드는 영문/숫자 6자리입니다. (예: A1B2C3)", "error");
+      return;
+    }
+
     socket.emit("room:join", { code });
     setStatus(`${code} 방으로 입장 중입니다...`);
     joinRoomCode.value = "";
