@@ -528,7 +528,7 @@ button:disabled {
 #messageInput {
   flex: 1;
   min-width: 0;
-  width: auto;
+  width: 0;
   border-radius: 999px;
   padding: 10px 18px;
   height: 40px;
