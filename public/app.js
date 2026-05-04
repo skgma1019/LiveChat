@@ -19,11 +19,14 @@
 
   function setupStatusBar() {
     const statusBar = document.getElementById("statusBar");
+    let dismissTimer = null;
 
     function setStatus(message, kind = "default") {
       if (!statusBar) {
         return;
       }
+
+      clearTimeout(dismissTimer);
 
       if (!message) {
         statusBar.classList.add("hidden");
@@ -40,6 +43,7 @@
       } else if (kind === "success") {
         statusBar.style.borderColor = "rgba(46, 125, 79, 0.24)";
         statusBar.style.background = "rgba(236, 250, 241, 0.95)";
+        dismissTimer = setTimeout(() => setStatus(""), 3000);
       } else {
         statusBar.style.borderColor = "rgba(191, 91, 49, 0.18)";
         statusBar.style.background = "rgba(255, 244, 233, 0.92)";
@@ -350,13 +354,16 @@
 
   function updateImagePreview() {
     const file = imageInput.files[0];
+    const imagePreviewRow = document.getElementById("imagePreviewRow");
     if (!file) {
-      imagePreviewText.textContent = "사진 또는 동영상은 선택 사항입니다.";
+      imagePreviewRow.classList.add("hidden");
+      imagePreviewText.textContent = "";
       return;
     }
 
     const mediaType = file.type.startsWith("video/") ? "동영상" : "사진";
-    imagePreviewText.textContent = `선택한 ${mediaType}: ${file.name}`;
+    imagePreviewText.textContent = `${mediaType}: ${file.name}`;
+    imagePreviewRow.classList.remove("hidden");
   }
 
   function updateMessageLengthHint() {
@@ -628,6 +635,8 @@
         if (!validateSelectedMedia(file)) {
           return;
         }
+        sendBtn.disabled = true;
+        sendBtn.textContent = "전송 중...";
         setStatus("미디어를 업로드하는 중입니다...", "default");
         uploadData = await fileToDataUrl(file);
       }
@@ -648,6 +657,9 @@
       setStatus("메시지를 보냈습니다.", "success");
     } catch (error) {
       setStatus(error.message, "error");
+    } finally {
+      sendBtn.disabled = !currentRoom;
+      sendBtn.textContent = "전송";
     }
   });
 
@@ -691,6 +703,21 @@
       event.preventDefault();
       joinRoomBtn.click();
     }
+  });
+
+  joinRoomCode.addEventListener("input", () => {
+    joinRoomCode.value = joinRoomCode.value.toUpperCase();
+  });
+
+  document.querySelectorAll(".tab-bar .tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab-bar .tab").forEach((t) => {
+        t.classList.toggle("active", t === tab);
+      });
+      document.querySelectorAll(".tab-content").forEach((c) => {
+        c.classList.toggle("hidden", c.dataset.tab !== tab.dataset.tab);
+      });
+    });
   });
 
   savedRooms.addEventListener("click", (event) => {
