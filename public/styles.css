@@ -597,6 +597,8 @@ button:disabled {
 }
 
 /* --- Responsive --- */
+
+/* Tablet (≤960px) */
 @media (max-width: 960px) {
   .hero,
   .dashboard,
@@ -604,14 +606,112 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  /* Chat card appears first above room-management cards */
+  .dashboard {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .kakao-chat-shell {
+    order: -1;
+  }
+
+  /* Give chat card a proper height without sidebar */
   .chat-card {
-    min-height: auto;
+    min-height: 0;
+    height: 72vh;
+    height: 72svh;
+  }
+
+  /* Hide participant sidebar — too cramped on narrow screens */
+  .room-sidebar {
+    display: none;
   }
 }
 
+/* Mobile (≤640px) */
 @media (max-width: 640px) {
+  .app-shell {
+    padding: 0 0 32px;
+  }
+
+  /* Side-panel cards: keep small horizontal margin */
+  .stack {
+    padding: 0 8px;
+    gap: 10px;
+  }
+
+  /* Auth pages keep their own padding */
+  .narrow-shell {
+    padding: 16px 8px 32px;
+  }
+
+  /* --- Hero --- */
   .hero {
-    padding: 20px;
+    padding: 20px 16px;
+    gap: 20px;
+    border-radius: 0;
+  }
+
+  .hero h1 {
+    font-size: clamp(26px, 8vw, 36px);
+  }
+
+  .hero-actions {
+    flex-direction: column;
+  }
+
+  .hero-actions > * {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* --- Chat card: full-screen on mobile --- */
+  .chat-card {
+    height: 100vh;
+    height: 100svh;
+    border-radius: 0;
+  }
+
+  /* Chat header */
+  .kakao-chat-head {
+    padding: 10px 14px;
+  }
+
+  .kakao-chat-head h2 {
+    font-size: 15px;
+    margin-bottom: 2px;
+  }
+
+  .leave-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .badge {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  /* Messages */
+  .message-item {
+    max-width: 88%;
+    padding: 8px 12px;
+  }
+
+  .kakao-message-board {
+    padding: 10px 12px;
+  }
+
+  /* Composer: iOS safe-area for home indicator */
+  .kakao-composer {
+    padding: 8px 10px max(10px, env(safe-area-inset-bottom));
+  }
+
+  /* font-size ≥ 16px prevents iOS auto-zoom on input focus */
+  #messageInput {
+    font-size: 16px;
+    padding: 8px 14px;
   }
 
   .composer-main {
@@ -620,5 +720,36 @@ button:disabled {
 
   .send-btn {
     padding: 0 14px;
+    font-size: 13px;
+  }
+
+  /* Cards & panels */
+  .panel {
+    padding: 16px;
+  }
+
+  .dashboard {
+    gap: 10px;
+  }
+}
+
+/* Very small phones (≤380px) */
+@media (max-width: 380px) {
+  .kakao-chat-head h2 {
+    font-size: 13px;
+  }
+
+  .attach-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  #messageInput {
+    height: 36px;
+  }
+
+  .send-btn {
+    height: 36px;
+    padding: 0 10px;
   }
 }
