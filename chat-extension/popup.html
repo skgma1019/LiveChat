@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>LiveChat</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ① 로그인 화면 -->
+  <div id="loginScreen" class="screen active">
+    <div class="login-inner">
+      <div class="login-brand">
+        <div class="brand-icon">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="9" fill="#3B5BDB"/>
+            <path d="M8 11h16M8 16h11M8 21h8" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h1>LiveChat</h1>
+        <p>실시간 채팅 서비스</p>
+      </div>
+
+      <div id="loginAlert" class="alert hidden"></div>
+
+      <div class="field">
+        <input id="loginUsername" type="text" placeholder="아이디" autocomplete="username" />
+      </div>
+      <div class="field">
+        <input id="loginPassword" type="password" placeholder="비밀번호" autocomplete="current-password" />
+      </div>
+      <button id="loginBtn" class="btn btn-primary btn-block">로그인</button>
+      <p class="login-hint">계정이 없다면 <a id="registerLink" href="#" target="_blank">회원가입</a></p>
+    </div>
+  </div>
+
+  <!-- ② 방 목록 화면 -->
+  <div id="roomListScreen" class="screen">
+    <div class="rl-head">
+      <div class="rl-head-left">
+        <h2 class="rl-title">채팅방</h2>
+        <p class="rl-sub">참가하거나 새로 만들어보세요</p>
+      </div>
+      <div class="rl-head-right">
+        <button id="joinCodeBtn" class="btn btn-outline btn-sm">+ 코드로 참가</button>
+        <button id="createRoomBtn" class="btn btn-primary btn-sm">+ 방 만들기</button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="saved">내가 만든 방</button>
+      <button class="tab" data-tab="recent">최근 들어간 방</button>
+    </div>
+
+    <div class="room-list-wrap">
+      <div id="savedList" class="tab-pane active"></div>
+      <div id="recentList" class="tab-pane"></div>
+    </div>
+
+    <div class="rl-foot">
+      <div class="user-row">
+        <div class="avatar-sm" id="footerAvatar">?</div>
+        <span id="footerNick" class="foot-nick">-</span>
+      </div>
+      <button id="logoutBtn" class="btn-link">로그아웃</button>
+    </div>
+  </div>
+
+  <!-- ③ 채팅 화면 -->
+  <div id="chatScreen" class="screen">
+    <div class="chat-head">
+      <button id="backBtn" class="icon-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+      <div class="chat-head-info">
+        <div class="chat-head-title">
+          <span class="hash">#</span>
+          <span id="chatTitle" class="chat-name">방 이름</span>
+          <span id="chatHostBadge" class="pill-badge hidden">방장</span>
+        </div>
+        <div class="chat-head-sub">
+          <span class="code-lbl">방 코드</span>
+          <span id="chatCode" class="code-val">------</span>
+          <span class="dot-sep">·</span>
+          <span id="chatCount">0</span>명 참가
+        </div>
+      </div>
+      <button id="copyCodeBtn" class="icon-btn" title="코드 복사">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+      </button>
+    </div>
+
+    <div id="msgList" class="msg-area"></div>
+
+    <div class="composer">
+      <input id="msgInput" type="text" class="msg-input" placeholder="메시지 보내기..." maxlength="5000" />
+      <button id="sendBtn" class="btn btn-primary btn-send">전송</button>
+    </div>
+  </div>
+
+  <!-- 모달: 코드로 참가 -->
+  <div id="joinModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>방 코드 입력</h3>
+        <p>방장이 공유한 코드를 적어주세요</p>
+      </div>
+      <input id="joinCodeInput" type="text" placeholder="예) DSN-3392" maxlength="6" />
+      <div class="modal-foot">
+        <button class="btn btn-outline modal-cancel">취소</button>
+        <button id="joinSubmit" class="btn btn-primary">참가</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 모달: 방 만들기 -->
+  <div id="createModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>새 채팅방 만들기</h3>
+        <p>방장 권한이 부여됩니다</p>
+      </div>
+      <div class="field">
+        <label>방 이름</label>
+        <input id="createTitle" type="text" placeholder="예) 디자인 시스템 회의" />
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-outline modal-cancel">취소</button>
+        <button id="createSubmit" class="btn btn-primary">만들기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- socket.io 클라이언트가 필요합니다.
+       https://cdn.socket.io/4.7.2/socket.io.min.js 를 다운로드해
+       chat-extension/ 폴더에 socket.io.min.js 로 저장하세요. -->
+  <script src="socket.io.min.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
