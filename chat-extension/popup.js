@@ -1,14 +1,17 @@
 'use strict';
 
-const BASE = 'https://livechat-u2jk.onrender.com';
+const BASE      = 'https://livechat-u2jk.onrender.com';
+const IMG_LIMIT = 2  * 1024 * 1024;  // 2 MB
+const VID_LIMIT = 10 * 1024 * 1024;  // 10 MB
 
 /* ────────────────────────────────────────────
    상태
 ──────────────────────────────────────────── */
-let token       = null;
-let currentUser = null;   // { id, username, nickname }
-let socket      = null;
-let currentRoom = null;   // { title, code, isHost, hostUserId }
+let token        = null;
+let currentUser  = null;   // { id, username, nickname }
+let socket       = null;
+let currentRoom  = null;   // { title, code, isHost, hostUserId }
+let isLoggingOut = false;  // 로그아웃 진행 중 재연결 차단용
 
 /* ────────────────────────────────────────────
    chrome.storage.local 헬퍼
@@ -74,6 +77,31 @@ function avClass(name = '') {
   return `av-${h % 8}`;
 }
 
+function absUrl(url) {
+  if (!url) return '';
+  return url.startsWith('/') ? `${BASE}${url}` : url;
+}
+
+async function uploadFile(file) {
+  const fd = new FormData();
+  fd.append('media', file);
+  const res = await fetch(`${BASE}/api/uploads`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || '파일 업로드에 실패했습니다.');
+  return data; // { mediaUrl, mediaMime }
+}
+
+function clearFileInput() {
+  const fi = document.getElementById('fileInput');
+  fi.value = '';
+  document.getElementById('filePreviewRow').classList.add('hidden');
+  document.getElementById('filePreviewName').textContent = '';
+}
+
 function relTime(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr), now = new Date();
@@ -96,8 +124,6 @@ function msgTime(dateStr) {
    초기화 — 저장된 토큰이 있으면 바로 방 목록으로
 ──────────────────────────────────────────── */
 async function init() {
-  document.getElementById('registerLink').href = `${BASE}/register.html`;
-
   token = await store.get('token');
   if (token) {
     try {
@@ -161,20 +187,96 @@ async function doLogin() {
 }
 
 /* ────────────────────────────────────────────
+   회원가입 화면 전환
+──────────────────────────────────────────── */
+document.getElementById('registerLink').addEventListener('click', e => {
+  e.preventDefault();
+  document.getElementById('registerAlert').classList.add('hidden');
+  document.getElementById('regUsername').value = '';
+  document.getElementById('regNickname').value = '';
+  document.getElementById('regPassword').value = '';
+  showScreen('registerScreen');
+});
+
+document.getElementById('backToLoginLink').addEventListener('click', e => {
+  e.preventDefault();
+  showScreen('loginScreen');
+});
+
+document.getElementById('registerBtn').addEventListener('click', doRegister);
+document.getElementById('regPassword').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doRegister();
+});
+
+async function doRegister() {
+  const un   = document.getElementById('regUsername').value.trim();
+  const nick = document.getElementById('regNickname').value.trim();
+  const pw   = document.getElementById('regPassword').value;
+
+  if (!un || !nick || !pw) {
+    setRegisterAlert('모든 항목을 입력해주세요.');
+    return;
+  }
+  if (pw.length < 4) {
+    setRegisterAlert('비밀번호는 4자 이상이어야 합니다.');
+    return;
+  }
+
+  const btn = document.getElementById('registerBtn');
+  btn.disabled = true;
+  btn.textContent = '처리 중...';
+
+  try {
+    await api('/api/auth/register', {
+      method: 'POST',
+      body: { username: un, nickname: nick, password: pw },
+    });
+    showScreen('loginScreen');
+    setLoginAlert('회원가입이 완료되었습니다. 로그인해주세요.', 'success');
+  } catch (e) {
+    setRegisterAlert(e.message || '회원가입에 실패했습니다.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '회원가입';
+  }
+}
+
+function setRegisterAlert(msg) {
+  const el = document.getElementById('registerAlert');
+  el.textContent = msg;
+  el.className = 'alert';
+  el.classList.remove('hidden');
+}
+
+/* ────────────────────────────────────────────
    로그아웃
 ──────────────────────────────────────────── */
-document.getElementById('logoutBtn').addEventListener('click', async () => {
-  await store.del('token');
-  token = null;
-  currentUser = null;
-  currentRoom = null;
+document.getElementById('logoutBtn').addEventListener('click', doLogout);
+
+async function doLogout() {
+  // 1. 소켓 먼저 끊기 — 이후 발생하는 disconnect 이벤트가 재연결을 시도하지 않도록
+  //    플래그를 disconnect() 호출 전에 세운다
+  isLoggingOut = true;
   disconnectSocket();
 
+  // 2. 스토리지 전체 삭제
+  await new Promise(r => chrome.storage.local.clear(r));
+
+  // 3. 상태 초기화
+  token       = null;
+  currentUser = null;
+  currentRoom = null;
+
+  // 4. UI 초기화 후 로그인 화면으로
+  closeMembersPanel();
+  hideReconnectBanner();
   document.getElementById('loginUsername').value = '';
   document.getElementById('loginPassword').value = '';
   document.getElementById('loginAlert').classList.add('hidden');
+
+  isLoggingOut = false;
   showScreen('loginScreen');
-});
+}
 
 /* ────────────────────────────────────────────
    하단 유저 정보 업데이트
@@ -313,7 +415,19 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
    — app.js: socket.emit('room:join', { code })
 ──────────────────────────────────────────── */
 function joinRoom(code) {
-  if (!socket) { alert('연결이 끊어졌습니다. 다시 로그인해주세요.'); return; }
+  if (!socket) {
+    // socket이 null이면 connectSocket()이 실패한 것 (socket.io 미로드 등)
+    // → 재연결 시도 후 join
+    connectSocket();
+    // socket.io 로드 실패 시 socket은 여전히 null
+    if (!socket) {
+      alert('소켓 연결에 실패했습니다. 확장을 다시 열어주세요.');
+      return;
+    }
+    // 연결 수립 후 session:user → 그 뒤 join
+    socket.once('connect', () => socket.emit('room:join', { code }));
+    return;
+  }
   socket.emit('room:join', { code });
   // room:state 이벤트에서 화면 전환 + 히스토리 로드
 }
@@ -325,7 +439,9 @@ function joinRoom(code) {
 document.getElementById('backBtn').addEventListener('click', () => {
   if (socket) socket.emit('room:leave');
   currentRoom = null;
+  closeMembersPanel();
   document.getElementById('msgList').innerHTML = '';
+  document.getElementById('membersList').innerHTML = '';
   loadRooms().catch(() => {});
   showScreen('roomListScreen');
 });
@@ -339,11 +455,28 @@ document.getElementById('copyCodeBtn').addEventListener('click', () => {
 });
 
 /* ────────────────────────────────────────────
+   재연결 배너 (전체 화면 위에 고정)
+──────────────────────────────────────────── */
+function showReconnectBanner(msg) {
+  const el = document.getElementById('reconnectBanner');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+function hideReconnectBanner() {
+  document.getElementById('reconnectBanner').classList.add('hidden');
+}
+
+/* ────────────────────────────────────────────
    소켓 연결
    — 서버 이벤트: session:user, room:state, room:users,
                   chat:history, chat:receive, system:notice,
                   room:kicked, chat:error, connect_error
+   — 재연결 이벤트: disconnect, reconnect_attempt,
+                    reconnect, reconnect_failed
 ──────────────────────────────────────────── */
+const RECONNECT_ATTEMPTS = 10;
+
 function connectSocket() {
   disconnectSocket();
 
@@ -355,7 +488,17 @@ function connectSocket() {
 
   socket = io(BASE, {
     transports: ['websocket'],
-    auth: { token },
+    // auth를 객체({ token })가 아닌 콜백으로 전달:
+    // 객체 형태는 최초 연결 시점의 token 값만 캡처하므로,
+    // 재연결(reconnect) 시 갱신된 토큰을 사용할 수 없음.
+    // 콜백 형태는 연결·재연결마다 호출되어 항상 최신 token을 전달함.
+    auth: (cb) => cb({ token }),
+    /* ── 재연결 설정 ── */
+    reconnection: true,
+    reconnectionAttempts: RECONNECT_ATTEMPTS,  // 최대 10회
+    reconnectionDelay: 1000,                   // 첫 재시도: 1초 후
+    reconnectionDelayMax: 30000,               // 최대 대기: 30초
+    randomizationFactor: 0.4,                  // ±40% 지터
   });
 
   /* 연결 시 사용자 정보 (app.js: socket.on('session:user')) */
@@ -390,6 +533,18 @@ function connectSocket() {
     }
     const count = payload?.users?.length ?? 0;
     document.getElementById('chatCount').textContent = count;
+
+    // room:members 보다 먼저 도착 — socketId 포함해 패널을 즉시 표시
+    // socketId가 있으면 서버가 targetSocketId로 직접 강퇴해 userId 역조회 불필요
+    if (payload?.users && payload?.room) {
+      const hostId = String(payload.room.hostUserId ?? '');
+      renderMembers(payload.users.map(u => ({
+        userId:   u.userId,
+        socketId: u.socketId,
+        username: u.nickname || u.userId || '?',
+        isOwner:  String(u.userId) === hostId,
+      })));
+    }
   });
 
   /* 메시지 히스토리 (입장 직후 수신) */
@@ -426,9 +581,65 @@ function connectSocket() {
     showScreen('roomListScreen');
   });
 
+  /* 참가자 목록 */
+  socket.on('room:members', members => {
+    renderMembers(members);
+  });
+
   /* 오류 */
-  socket.on('chat:error', msg => appendSys(`⚠️ ${msg}`));
-  socket.on('connect_error', () => appendSys('⚠️ 소켓 연결에 실패했습니다.'));
+  socket.on('chat:error',    msg => appendSys(`⚠️ ${msg}`));
+  socket.on('connect_error', ()  => appendSys('⚠️ 소켓 연결에 실패했습니다.'));
+
+  /* ── 재연결 이벤트 ── */
+
+  // 연결 끊김 — 이유에 따라 구분
+  socket.on('disconnect', reason => {
+    // 로그아웃으로 인한 끊김이면 재연결 시도 안 함
+    if (isLoggingOut) return;
+
+    // 'io server disconnect': 서버가 의도적으로 끊음 (강퇴·auth 거부)
+    // → socket.io가 자동 재연결하지 않으므로 수동 reconnect
+    if (reason === 'io server disconnect') {
+      showReconnectBanner('서버 연결이 끊어졌습니다. 재연결 중...');
+      if (currentRoom) appendSys('⚠️ 서버 연결이 끊어졌습니다. 재연결 중...');
+      socket.connect();
+    } else {
+      // 'transport close' | 'transport error' | 'ping timeout'
+      // → socket.io가 자동으로 재연결 시도
+      showReconnectBanner('연결 끊김 · 재연결 중...');
+      if (currentRoom) appendSys('⚠️ 연결이 끊어졌습니다. 재연결 시도 중...');
+    }
+  });
+
+  // 재연결 시도 중 (1, 2, 3... 회차)
+  socket.on('reconnect_attempt', attempt => {
+    if (isLoggingOut) return;
+    showReconnectBanner(`재연결 시도 중... (${attempt} / ${RECONNECT_ATTEMPTS})`);
+  });
+
+  // 재연결 성공 → 이전에 있던 방으로 자동 재입장
+  socket.on('reconnect', () => {
+    if (isLoggingOut) return;
+    hideReconnectBanner();
+    if (currentRoom?.code) {
+      appendSys('✅ 재연결되었습니다. 방으로 다시 입장합니다...');
+      socket.emit('room:join', { code: currentRoom.code });
+    }
+  });
+
+  // 최대 재시도 횟수 초과 → 로그인 화면으로 복귀
+  socket.on('reconnect_failed', async () => {
+    if (isLoggingOut) return;
+    showReconnectBanner(`재연결 실패 · ${RECONNECT_ATTEMPTS}회 시도 후 포기했습니다.`);
+    if (currentRoom) appendSys('❌ 재연결에 실패했습니다. 다시 로그인해주세요.');
+    await store.del('token');
+    token = null;
+    currentRoom = null;
+    setTimeout(() => {
+      hideReconnectBanner();
+      showScreen('loginScreen');
+    }, 3000);
+  });
 }
 
 function disconnectSocket() {
@@ -450,8 +661,8 @@ function appendMsg(msg) {
   const time  = msgTime(msg.createdAt);
 
   // app.js: mediaMime 기준으로 이미지/비디오 판별
-  const imgUrl   = msg.mediaMime?.startsWith('image/') ? msg.mediaUrl : (msg.imageData || '');
-  const videoUrl = msg.mediaMime?.startsWith('video/') ? msg.mediaUrl : (msg.videoData || '');
+  const imgUrl   = absUrl(msg.mediaMime?.startsWith('image/') ? msg.mediaUrl : (msg.imageData || ''));
+  const videoUrl = absUrl(msg.mediaMime?.startsWith('video/') ? msg.mediaUrl : (msg.videoData || ''));
 
   let content = '';
   if (imgUrl) {
@@ -488,6 +699,95 @@ function scrollBottom() {
 }
 
 /* ────────────────────────────────────────────
+   참가자 패널
+──────────────────────────────────────────── */
+function renderMembers(members) {
+  const list  = document.getElementById('membersList');
+  const title = document.getElementById('membersPanelTitle');
+  title.textContent = `참가자 ${members.length}명`;
+
+  if (!members.length) {
+    list.innerHTML = '<div class="members-empty">참가자가 없습니다</div>';
+    return;
+  }
+
+  const amHost = currentRoom?.isHost ?? false;
+
+  list.innerHTML = members.map(m => {
+    const name  = m.username || '?';
+    const first = name[0].toUpperCase();
+    const av    = avClass(name);
+    const ownerBadge = m.isOwner
+      ? '<span class="member-owner-badge">방장</span>' : '';
+    const kickBtn = (amHost && !m.isOwner)
+      ? `<button class="kick-btn" data-uid="${esc(m.userId)}" data-sid="${esc(m.socketId || '')}">강퇴</button>` : '';
+    return `
+      <div class="member-item">
+        <div class="member-avatar ${av}">${first}</div>
+        <span class="member-name">${esc(name)}</span>
+        ${ownerBadge}
+        ${kickBtn}
+      </div>`;
+  }).join('');
+
+  list.querySelectorAll('.kick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!socket) return;
+      const sid = btn.dataset.sid;
+      const uid = btn.dataset.uid;
+      // socketId가 있으면 targetSocketId 우선 — 서버 역조회 없이 바로 처리
+      // 없으면(room:members 경로) userId로 서버가 역조회
+      socket.emit('room:kick', sid
+        ? { targetSocketId: sid }
+        : { userId: uid });
+    });
+  });
+}
+
+function openMembersPanel() {
+  document.getElementById('membersPanel').classList.remove('hidden');
+}
+
+function closeMembersPanel() {
+  document.getElementById('membersPanel').classList.add('hidden');
+}
+
+document.getElementById('membersBtn').addEventListener('click', () => {
+  const panel = document.getElementById('membersPanel');
+  panel.classList.toggle('hidden');
+});
+
+document.getElementById('membersPanelClose').addEventListener('click', closeMembersPanel);
+
+/* ────────────────────────────────────────────
+   파일 첨부
+──────────────────────────────────────────── */
+document.getElementById('attachBtn').addEventListener('click', () => {
+  document.getElementById('fileInput').click();
+});
+
+document.getElementById('fileInput').addEventListener('change', () => {
+  const file = document.getElementById('fileInput').files[0];
+  if (!file) return;
+
+  if (file.type.startsWith('image/') && file.size > IMG_LIMIT) {
+    document.getElementById('fileInput').value = '';
+    appendSys('⚠️ 이미지 파일은 2MB 이하만 첨부할 수 있습니다.');
+    return;
+  }
+  if (file.type.startsWith('video/') && file.size > VID_LIMIT) {
+    document.getElementById('fileInput').value = '';
+    appendSys('⚠️ 동영상 파일은 10MB 이하만 첨부할 수 있습니다.');
+    return;
+  }
+
+  document.getElementById('filePreviewName').textContent = file.name;
+  document.getElementById('filePreviewRow').classList.remove('hidden');
+});
+
+document.getElementById('fileClearBtn').addEventListener('click', clearFileInput);
+
+/* ────────────────────────────────────────────
    메시지 전송
    — app.js: socket.emit('chat:send', { text, mediaUrl, mediaMime, imageData, videoData })
 ──────────────────────────────────────────── */
@@ -496,21 +796,35 @@ document.getElementById('msgInput').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
 });
 
-function sendMsg() {
+async function sendMsg() {
   const input = document.getElementById('msgInput');
   const text  = input.value.trim();
-  if (!text || !socket || !currentRoom) return;
+  const file  = document.getElementById('fileInput').files[0];
+  if ((!text && !file) || !socket || !currentRoom) return;
 
-  socket.emit('chat:send', {
-    text,
-    mediaUrl:  '',
-    mediaMime: '',
-    imageData: '',
-    videoData: '',
-  });
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true;
 
-  input.value = '';
-  input.focus();
+  try {
+    let mediaUrl = '', mediaMime = '';
+
+    if (file) {
+      btn.textContent = '업로드 중...';
+      const data = await uploadFile(file);
+      mediaUrl  = data.mediaUrl  || '';
+      mediaMime = data.mediaMime || '';
+      clearFileInput();
+    }
+
+    socket.emit('chat:send', { text, mediaUrl, mediaMime, imageData: '', videoData: '' });
+    input.value = '';
+    input.focus();
+  } catch (e) {
+    appendSys(`⚠️ ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '전송';
+  }
 }
 
 /* ────────────────────────────────────────────

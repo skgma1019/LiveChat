@@ -30,11 +30,41 @@
         <input id="loginPassword" type="password" placeholder="비밀번호" autocomplete="current-password" />
       </div>
       <button id="loginBtn" class="btn btn-primary btn-block">로그인</button>
-      <p class="login-hint">계정이 없다면 <a id="registerLink" href="#" target="_blank">회원가입</a></p>
+      <p class="login-hint">계정이 없다면 <a id="registerLink" href="#">회원가입</a></p>
     </div>
   </div>
 
-  <!-- ② 방 목록 화면 -->
+  <!-- ② 회원가입 화면 -->
+  <div id="registerScreen" class="screen">
+    <div class="login-inner">
+      <div class="login-brand">
+        <div class="brand-icon">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="9" fill="#3B5BDB"/>
+            <path d="M8 11h16M8 16h11M8 21h8" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h1>LiveChat</h1>
+        <p>새 계정 만들기</p>
+      </div>
+
+      <div id="registerAlert" class="alert hidden"></div>
+
+      <div class="field">
+        <input id="regUsername" type="text" placeholder="아이디" autocomplete="username" />
+      </div>
+      <div class="field">
+        <input id="regNickname" type="text" placeholder="닉네임" />
+      </div>
+      <div class="field">
+        <input id="regPassword" type="password" placeholder="비밀번호 (4자 이상)" autocomplete="new-password" />
+      </div>
+      <button id="registerBtn" class="btn btn-primary btn-block">회원가입</button>
+      <p class="login-hint">이미 계정이 있으신가요? <a id="backToLoginLink" href="#">로그인</a></p>
+    </div>
+  </div>
+
+  <!-- ③ 방 목록 화면 -->
   <div id="roomListScreen" class="screen">
     <div class="rl-head">
       <div class="rl-head-left">
@@ -66,7 +96,7 @@
     </div>
   </div>
 
-  <!-- ③ 채팅 화면 -->
+  <!-- ④ 채팅 화면 -->
   <div id="chatScreen" class="screen">
     <div class="chat-head">
       <button id="backBtn" class="icon-btn">
@@ -87,6 +117,14 @@
           <span id="chatCount">0</span>명 참가
         </div>
       </div>
+      <button id="membersBtn" class="icon-btn" title="참가자 목록">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </button>
       <button id="copyCodeBtn" class="icon-btn" title="코드 복사">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -94,11 +132,43 @@
       </button>
     </div>
 
+    <!-- 참가자 패널 (토글) -->
+    <div id="membersPanel" class="members-panel hidden">
+      <div class="members-panel-head">
+        <span id="membersPanelTitle" class="members-panel-title">참가자</span>
+        <button id="membersPanelClose" class="icon-btn members-close-btn">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div id="membersList" class="members-list"></div>
+    </div>
+
     <div id="msgList" class="msg-area"></div>
 
     <div class="composer">
-      <input id="msgInput" type="text" class="msg-input" placeholder="메시지 보내기..." maxlength="5000" />
-      <button id="sendBtn" class="btn btn-primary btn-send">전송</button>
+      <input id="fileInput" type="file" accept="image/*,video/*" />
+      <div id="filePreviewRow" class="file-preview-row hidden">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3B5BDB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
+        <span id="filePreviewName" class="file-preview-name"></span>
+        <button id="fileClearBtn" class="icon-btn file-clear-btn" title="취소">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="composer-row">
+        <button id="attachBtn" class="icon-btn" title="파일 첨부">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+          </svg>
+        </button>
+        <input id="msgInput" type="text" class="msg-input" placeholder="메시지 보내기..." maxlength="5000" />
+        <button id="sendBtn" class="btn btn-primary btn-send">전송</button>
+      </div>
     </div>
   </div>
 
@@ -134,6 +204,9 @@
       </div>
     </div>
   </div>
+
+  <!-- 재연결 배너 (모든 화면 위에 고정) -->
+  <div id="reconnectBanner" class="reconnect-banner hidden"></div>
 
   <!-- socket.io 클라이언트가 필요합니다.
        https://cdn.socket.io/4.7.2/socket.io.min.js 를 다운로드해

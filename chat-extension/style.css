@@ -13,6 +13,27 @@ body {
   position: relative;
 }
 
+/* ===== 재연결 배너 ===== */
+.reconnect-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 300;
+  padding: 7px 14px;
+  background: #1e293b;
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  animation: bannerSlide 0.2s ease;
+}
+
+@keyframes bannerSlide {
+  from { opacity: 0; transform: translateY(-100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ===== 화면 전환 ===== */
 .screen {
   position: absolute;
@@ -589,12 +610,46 @@ input::placeholder { color: #A0AEC0; }
 /* 작성란 */
 .composer {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
+  flex-direction: column;
   border-top: 1.5px solid #E2E8F0;
   background: #fff;
   flex-shrink: 0;
+}
+
+#fileInput { display: none; }
+
+.file-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 12px;
+  background: #EEF2FF;
+  border-bottom: 1px solid #E0E7FF;
+  min-width: 0;
+}
+
+.file-preview-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #3B5BDB;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-clear-btn {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.composer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
 }
 
 .msg-input {
@@ -623,6 +678,109 @@ input::placeholder { color: #A0AEC0; }
   border-radius: 8px;
   flex-shrink: 0;
 }
+
+/* ===================== */
+/* 참가자 패널            */
+/* ===================== */
+.members-panel {
+  flex-shrink: 0;
+  max-height: 210px;
+  overflow-y: auto;
+  border-bottom: 1.5px solid #E2E8F0;
+  background: #fff;
+}
+
+.members-panel::-webkit-scrollbar { width: 4px; }
+.members-panel::-webkit-scrollbar-track { background: transparent; }
+.members-panel::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+
+.members-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 7px;
+  border-bottom: 1px solid #F1F5F9;
+  position: sticky;
+  top: 0;
+  background: #F8FAFC;
+  z-index: 1;
+}
+
+.members-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.members-close-btn {
+  width: 22px;
+  height: 22px;
+}
+
+.members-list { padding: 4px 0; }
+
+.members-empty {
+  padding: 16px;
+  text-align: center;
+  font-size: 12px;
+  color: #94A3B8;
+}
+
+.member-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+}
+
+.member-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.member-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.member-owner-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #EEF2FF;
+  color: #3B5BDB;
+  flex-shrink: 0;
+}
+
+.kick-btn {
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 5px;
+  background: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+.kick-btn:hover { background: #FEE2E2; }
 
 /* ===================== */
 /* 모달                   */

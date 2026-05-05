@@ -175,6 +175,19 @@ async function emitRoomUsers(roomCode) {
   });
 }
 
+async function emitRoomMembers(roomCode) {
+  const room = await Room.findOne({ code: roomCode }, "hostUserId").lean();
+  const hostUserId = room ? String(room.hostUserId) : "";
+  const members = Array.from(activeUsers.values())
+    .filter((u) => u.roomCode === roomCode)
+    .map((u) => ({
+      userId: u.userId,
+      username: u.username,
+      isOwner: u.userId === hostUserId
+    }));
+  io.to(roomCode).emit("room:members", members);
+}
+
 function createRoomCode() {
   return crypto.randomBytes(3).toString("hex").toUpperCase();
 }
@@ -238,6 +251,7 @@ async function leaveCurrentRoom(socket) {
     messages: []
   });
   await emitRoomUsers(previousRoomCode);
+  await emitRoomMembers(previousRoomCode);
 }
 
 async function joinRoom(socket, room) {
@@ -277,6 +291,7 @@ async function joinRoom(socket, room) {
     messages: history
   });
   await emitRoomUsers(room.code);
+  await emitRoomMembers(room.code);
 }
 
 function requireHttpUser(req, res, next) {
@@ -460,6 +475,7 @@ io.use((socket, next) => {
 io.on("connection", (socket) => {
   activeUsers.set(socket.id, {
     userId: socket.user.id,
+    username: socket.user.username,
     nickname: socket.user.nickname,
     roomCode: null,
     roomTitle: null,
@@ -520,13 +536,20 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("room:kick", async ({ targetSocketId }) => {
+  socket.on("room:kick", async ({ targetSocketId, userId }) => {
     try {
       const activeUser = activeUsers.get(socket.id);
 
       if (!activeUser?.roomCode) {
         socket.emit("chat:error", "방에 참가한 상태에서만 강퇴할 수 있습니다.");
         return;
+      }
+
+      // userId로 강퇴 요청 시 같은 방의 socketId를 역조회
+      if (!targetSocketId && userId) {
+        const entry = Array.from(activeUsers.entries())
+          .find(([, u]) => u.userId === userId && u.roomCode === activeUser.roomCode);
+        targetSocketId = entry?.[0];
       }
 
       if (targetSocketId === socket.id) {
@@ -625,6 +648,7 @@ io.on("connection", (socket) => {
 
       if (activeUser?.roomCode) {
         await emitRoomUsers(activeUser.roomCode);
+        await emitRoomMembers(activeUser.roomCode);
       }
     } catch (error) {
       console.error("Disconnect error:", error);

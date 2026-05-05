@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -L -o \"c:/Users/user/Desktop/programming-use/LiveChat/chat-extension/socket.io.min.js\" \"https://cdn.socket.io/4.7.2/socket.io.min.js\")"
+    ]
+  }
+}
